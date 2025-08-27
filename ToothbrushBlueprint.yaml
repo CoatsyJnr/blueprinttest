@@ -1,0 +1,146 @@
+blueprint:
+  name: Evening Brushing System
+  description: A full-system blueprint to track evening toothbrushing and send a random reminder.
+  domain: automation
+  author: Your Name (or leave blank)
+  homeassistant:
+    min_version: '2023.11.0'
+  input:
+    system_id:
+      name: System ID
+      description: A unique ID for this system (e.g., 'evening_brushing'). Used for entity names.
+      default: 'evening_brushing'
+      selector:
+        text:
+    toothbrush_entity:
+      name: Toothbrush State Sensor
+      description: The 'state' sensor of your Oral-B toothbrush.
+      selector:
+        entity:
+          domain: sensor
+    reminder_time:
+      name: Reminder Time
+      description: The time of day to send the reminder.
+      default: '21:00:00'
+      selector:
+        time:
+    evening_check_start_time:
+      name: Evening Check Start Time
+      description: The time to start checking for a brushing session.
+      default: '17:00:00'
+      selector:
+        time:
+    brushing_duration:
+      name: Brushing Duration (minutes)
+      description: The length of a valid brushing session.
+      default: 5
+      selector:
+        number:
+          min: 1
+          max: 10
+          step: 1
+          mode: box
+    min_random_delay:
+      name: Minimum Random Delay (minutes)
+      description: The minimum number of minutes for the random delay.
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 60
+          step: 1
+          mode: slider
+    max_random_delay:
+      name: Maximum Random Delay (minutes)
+      description: The maximum number of minutes for the random delay.
+      default: 10
+      selector:
+        number:
+          min: 0
+          max: 60
+          step: 1
+          mode: slider
+    notification_device:
+      name: Notification Device
+      description: The mobile device to send the notification to.
+      selector:
+        device:
+          integration: mobile_app
+    notification_title:
+      name: Notification Title
+      description: The title of the reminder notification.
+      default: 'Friendly Reminder'
+    notification_message:
+      name: Notification Message
+      description: The message for the reminder notification.
+      default: 'Hey, it''s getting late! Don''t forget to brush your teeth.'
+
+automation:
+  - id: '{{ system_id }}_set_flag'
+    alias: '{{ system_id | replace("_", " ") | title }} - Set Flag'
+    description: Turns on helper when toothbrush is used in the evening.
+    trigger:
+      - platform: state
+        entity_id: !input 'toothbrush_entity'
+        to: 'running'
+        for:
+          minutes: !input 'brushing_duration'
+    condition:
+      - condition: time
+        after: !input 'evening_check_start_time'
+        before: '23:59:59'
+    action:
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.{{ system_id }}
+    mode: single
+
+  - id: '{{ system_id }}_send_reminder'
+    alias: '{{ system_id | replace("_", " ") | title }} - Send Reminder'
+    description: Sends the reminder notification if helper is off.
+    trigger:
+      - platform: time
+        at: !input 'reminder_time'
+    condition:
+      - condition: state
+        entity_id: input_boolean.{{ system_id }}
+        state: 'off'
+    action:
+      - delay:
+          minutes: "{{ range(states('input_number.{{ system_id }}_min_delay') | int, (states('input_number.{{ system_id }}_max_delay') | int) + 1) | random }}"
+      - service: notify.mobile_app_{{ device_id(notification_device) }}
+        data:
+          title: !input 'notification_title'
+          message: !input 'notification_message'
+    mode: single
+
+  - id: '{{ system_id }}_reset_flag'
+    alias: '{{ system_id | replace("_", " ") | title }} - Reset Flag'
+    description: Resets the helper flag at midnight.
+    trigger:
+      - platform: time
+        at: '00:00:00'
+    action:
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.{{ system_id }}
+    mode: single
+
+helper:
+  - name: '{{ system_id | replace("_", " ") | title }} Toggle'
+    entity_id: input_boolean.{{ system_id }}
+    platform: input_boolean
+  - name: '{{ system_id | replace("_", " ") | title }} Min Delay'
+    entity_id: input_number.{{ system_id }}_min_delay
+    platform: input_number
+    min: 0
+    max: 60
+    step: 1
+    mode: slider
+  - name: '{{ system_id | replace("_", " ") | title }} Max Delay'
+    entity_id: input_number.{{ system_id }}_max_delay
+    platform: input_number
+    min: 0
+    max: 60
+    step: 1
+    mode: slider
