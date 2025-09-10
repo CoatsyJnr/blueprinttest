@@ -18,7 +18,6 @@ blueprint:
       selector:
         entity:
           domain: sensor
-          integration: oralb
     reminder_time:
       name: Reminder Time
       description: The time of day to send the reminder.
