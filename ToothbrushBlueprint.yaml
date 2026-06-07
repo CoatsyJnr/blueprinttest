@@ -68,7 +68,7 @@ blueprint:
     randomizer_settings:
       name: 🎲 ADHD Randomizer Delay
       description: >
-        Adding unpredictability to alerts helps ADHD, neurodivergent, and neurotypical brains alike. When an alarm fires at the exact same time every day, your brain creates a habit of swiping it away without reading it (notification blindness). Randomizing the delay forces your brain to actively register the interruption.
+        Adding unpredictability to alerts helps break notification blindness. The reminder will fire randomly between 0 minutes and your chosen maximum delay. (A 15-minute window is recommended to remain unpredictable without losing the context of the task).
       icon: mdi:dice-multiple
       collapsed: false
       input:
@@ -78,18 +78,10 @@ blueprint:
           default: true
           selector:
             boolean: {}
-        min_random_delay:
-          name: Minimum Random Delay (minutes)
+        random_delay_window:
+          name: Randomizer Window (minutes)
+          description: The maximum number of minutes the notification can be randomly delayed.
           default: 15
-          selector:
-            number:
-              min: 0.0
-              max: 60.0
-              step: 1.0
-              mode: slider
-        max_random_delay:
-          name: Maximum Random Delay (minutes)
-          default: 30
           selector:
             number:
               min: 0.0
@@ -158,8 +150,7 @@ variables:
   morning_enabled: !input enable_morning
   evening_enabled: !input enable_evening
   randomizer_enabled: !input enable_randomizer
-  min_delay: !input min_random_delay
-  max_delay: !input max_random_delay
+  max_delay: !input random_delay_window
   use_custom_am_start: !input use_custom_morning_start
   custom_am_start: !input custom_morning_start_time
   use_custom_pm_start: !input use_custom_evening_start
@@ -235,7 +226,7 @@ action:
           - delay:
               minutes: >
                 {% if randomizer_enabled %}
-                  {{ range(min_delay | int, max_delay | int + 1) | random }}
+                  {{ range(0, max_delay | int + 1) | random }}
                 {% else %}
                   0
                 {% endif %}
@@ -261,7 +252,7 @@ action:
           - delay:
               minutes: >
                 {% if randomizer_enabled %}
-                  {{ range(min_delay | int, max_delay | int + 1) | random }}
+                  {{ range(0, max_delay | int + 1) | random }}
                 {% else %}
                   0
                 {% endif %}
