@@ -38,65 +38,46 @@ blueprint:
 
     enable_morning:
       name: Enable Morning Reminders
-      description: Check this box to track and remind you in the morning.
+      description: Check this box to track your morning routine.
       default: false
       selector:
         boolean: {}
 
+    morning_reminder_time:
+      name: Morning Reminder Time
+      description: The baseline time for the morning alarm. (Only applies if 'Enable Morning Reminders' is checked above).
+      default: '09:00:00'
+      selector:
+        time: {}
+
     enable_evening:
       name: Enable Evening Reminders
-      description: Check this box to track and remind you in the evening.
+      description: Check this box to track your evening routine.
       default: true
       selector:
         boolean: {}
 
-    # --- ADVANCED CONFIGURATION (COLLAPSED) ---
-    advanced_timing:
-      name: ⚙️ Advanced Timing Options
-      icon: mdi:clock-outline
-      collapsed: true
-      input:
-        morning_check_start_time:
-          name: Morning Check Start Time
-          description: Earliest time a morning brushing session counts.
-          default: '05:00:00'
-          selector:
-            time: {}
-        morning_reminder_time:
-          name: Morning Reminder Time
-          description: The baseline time to check if you brushed this morning.
-          default: '09:00:00'
-          selector:
-            time: {}
-        evening_check_start_time:
-          name: Evening Check Start Time
-          description: Earliest time an evening brushing session counts.
-          default: '17:00:00'
-          selector:
-            time: {}
-        evening_reminder_time:
-          name: Evening Reminder Time
-          description: The baseline time to check if you brushed this evening.
-          default: '21:00:00'
-          selector:
-            time: {}
-        brushing_duration:
-          name: Minimum Brushing Duration (minutes)
-          description: How long the toothbrush must run to count as a valid session.
-          default: 2
-          selector:
-            number:
-              min: 1.0
-              max: 5.0
-              step: 1.0
-              mode: box
+    evening_reminder_time:
+      name: Evening Reminder Time
+      description: The baseline time for the evening alarm. (Only applies if 'Enable Evening Reminders' is checked above).
+      default: '21:00:00'
+      selector:
+        time: {}
 
-    advanced_randomizer:
+    # --- RANDOMIZER SECTION (VISIBLE) ---
+    randomizer_settings:
       name: 🎲 ADHD Randomizer Delay
-      description: Adjust the unpredictable window to stop your brain from tuning out the alarm.
+      description: >
+        Adding unpredictability to alerts helps ADHD, neurodivergent, and neurotypical brains alike. When an alarm fires at the exact same time every day, your brain creates a habit of swiping it away without reading it (notification blindness). Randomizing the delay forces your brain to actively register the interruption.
       icon: mdi:dice-multiple
-      collapsed: true
+      collapsed: false
       input:
+        enable_randomizer:
+          name: Enable Randomizer Delay
+          description: If turned off, notifications will fire precisely at the reminder times set above (0 minute delay).
+          default: true
+          selector:
+            boolean: {}
         min_random_delay:
           name: Minimum Random Delay (minutes)
           default: 15
@@ -116,9 +97,11 @@ blueprint:
               step: 1.0
               mode: slider
 
-    advanced_notifications:
-      name: 💬 Custom Notification Text
-      icon: mdi:message-text-outline
+    # --- ADVANCED CONFIGURATION (COLLAPSED) ---
+    advanced_settings:
+      name: ⚙️ Advanced Settings
+      description: Optional customizations. Proceed with caution when altering check times.
+      icon: mdi:cogs
       collapsed: true
       input:
         notification_title:
@@ -136,12 +119,51 @@ blueprint:
           default: Future you will thank you. Let's knock out toothbrushing now so you can properly unwind.
           selector:
             text: {}
+        brushing_duration:
+          name: Minimum Brushing Duration (minutes)
+          description: How long the toothbrush must run to count as a valid session.
+          default: 2
+          selector:
+            number:
+              min: 1.0
+              max: 5.0
+              step: 1.0
+              mode: box
+        use_custom_morning_start:
+          name: Override Morning Check Time
+          description: ⚠️ ADVANCED: The system naturally starts tracking morning brushing at 4:00 AM. Only check this box if you have a highly unusual schedule (e.g., shift work) and need to alter the core logic.
+          default: false
+          selector:
+            boolean: {}
+        custom_morning_start_time:
+          name: Custom Morning Check Start Time
+          description: Takes effect only if the override box above is checked.
+          default: '04:00:00'
+          selector:
+            time: {}
+        use_custom_evening_start:
+          name: Override Evening Check Time
+          description: ⚠️ ADVANCED: The system naturally starts tracking evening brushing at 4:00 PM (16:00). Only check this box to alter the core logic.
+          default: false
+          selector:
+            boolean: {}
+        custom_evening_start_time:
+          name: Custom Evening Check Start Time
+          description: Takes effect only if the override box above is checked.
+          default: '16:00:00'
+          selector:
+            time: {}
 
 variables:
-  min_delay: !input min_random_delay
-  max_delay: !input max_random_delay
   morning_enabled: !input enable_morning
   evening_enabled: !input enable_evening
+  randomizer_enabled: !input enable_randomizer
+  min_delay: !input min_random_delay
+  max_delay: !input max_random_delay
+  use_custom_am_start: !input use_custom_morning_start
+  custom_am_start: !input custom_morning_start_time
+  use_custom_pm_start: !input use_custom_evening_start
+  custom_pm_start: !input custom_evening_start_time
 
 mode: single
 
@@ -173,22 +195,28 @@ action:
             id: 'toothbrush_used'
         sequence:
           - choose:
+              # Morning Match
               - conditions:
                   - condition: template
                     value_template: "{{ morning_enabled }}"
-                  - condition: time
-                    after: !input morning_check_start_time
-                    before: '12:00:00'
+                  - condition: template
+                    value_template: >
+                      {% set current_time = now().strftime('%H:%M:%S') %}
+                      {% set start_time = custom_am_start if use_custom_am_start else '04:00:00' %}
+                      {{ current_time >= start_time and current_time < '12:00:00' }}
                 sequence:
                   - service: input_boolean.turn_on
                     target:
                       entity_id: !input brushed_helper
+              # Evening Match
               - conditions:
                   - condition: template
                     value_template: "{{ evening_enabled }}"
-                  - condition: time
-                    after: !input evening_check_start_time
-                    before: '23:59:59'
+                  - condition: template
+                    value_template: >
+                      {% set current_time = now().strftime('%H:%M:%S') %}
+                      {% set start_time = custom_pm_start if use_custom_pm_start else '16:00:00' %}
+                      {{ current_time >= start_time and current_time <= '23:59:59' }}
                 sequence:
                   - service: input_boolean.turn_on
                     target:
@@ -205,7 +233,12 @@ action:
             state: 'off'
         sequence:
           - delay:
-              minutes: "{{ range(min_delay | int, max_delay | int + 1) | random }}"
+              minutes: >
+                {% if randomizer_enabled %}
+                  {{ range(min_delay | int, max_delay | int + 1) | random }}
+                {% else %}
+                  0
+                {% endif %}
           - condition: state
             entity_id: !input brushed_helper
             state: 'off'
@@ -226,7 +259,12 @@ action:
             state: 'off'
         sequence:
           - delay:
-              minutes: "{{ range(min_delay | int, max_delay | int + 1) | random }}"
+              minutes: >
+                {% if randomizer_enabled %}
+                  {{ range(min_delay | int, max_delay | int + 1) | random }}
+                {% else %}
+                  0
+                {% endif %}
           - condition: state
             entity_id: !input brushed_helper
             state: 'off'
