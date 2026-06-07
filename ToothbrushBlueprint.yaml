@@ -1,107 +1,141 @@
 blueprint:
-  name: Flexible Brushing System (Morning & Evening)
+  name: ADHD-Friendly Brushing System (Morning & Evening)
   description: >
-    Tracks morning and/or evening toothbrushing and sends a random, ADHD-friendly reminder if you forget.
-    **Note:** You must manually create one Input Boolean (Toggle) helper to use this blueprint.
+    An unpredictable, ADHD-friendly toothbrushing tracker and reminder system. 
+    Delays notifications by a random window to defeat notification blindness.
+    
+    **Prerequisite:** You must manually create one 'Input Boolean' (Toggle) helper in Home Assistant before configuring this automation.
   domain: automation
   homeassistant:
     min_version: 2023.11.0
+  
   input:
+    # --- PRIMARY SETUP ---
     toothbrush_entity:
       name: Toothbrush State Sensor
-      description: The 'state' sensor of your Oral-B toothbrush.
+      description: Select your Oral-B toothbrush state sensor.
       selector:
         entity:
+          integration: oralb
           domain: sensor
           multiple: false
+
     brushed_helper:
-      name: Brushing Tracker (Input Boolean)
-      description: The toggle helper used to store whether you've brushed for the current session.
+      name: Brushing Tracker Helper
+      description: Choose the Input Boolean (Toggle) helper you created to track your daily progress.
       selector:
         entity:
           domain: input_boolean
           multiple: false
-    enable_morning:
-      name: Enable Morning Reminder
-      description: Toggle this on to track and remind you in the morning.
-      default: false
-      selector:
-        boolean: {}
-    morning_check_start_time:
-      name: Morning Check Start Time
-      description: The earliest time a morning brushing session counts.
-      default: '05:00:00'
-      selector:
-        time: {}
-    morning_reminder_time:
-      name: Morning Reminder Time
-      description: The baseline time to check if you brushed this morning.
-      default: '09:00:00'
-      selector:
-        time: {}
-    enable_evening:
-      name: Enable Evening Reminder
-      description: Toggle this on to track and remind you in the evening.
-      default: true
-      selector:
-        boolean: {}
-    evening_check_start_time:
-      name: Evening Check Start Time
-      description: The earliest time an evening brushing session counts.
-      default: '17:00:00'
-      selector:
-        time: {}
-    evening_reminder_time:
-      name: Evening Reminder Time
-      description: The baseline time to check if you brushed this evening.
-      default: '21:00:00'
-      selector:
-        time: {}
-    brushing_duration:
-      name: Brushing Duration (minutes)
-      description: The length of a valid brushing session.
-      default: 2
-      selector:
-        number:
-          min: 1.0
-          max: 10.0
-          step: 1.0
-          mode: box
-    min_random_delay:
-      name: Minimum Random Delay (minutes)
-      description: Minimum minutes to delay the notification.
-      default: 15
-      selector:
-        number:
-          min: 0.0
-          max: 60.0
-          step: 1.0
-          mode: slider
-    max_random_delay:
-      name: Maximum Random Delay (minutes)
-      description: Maximum minutes to delay the notification.
-      default: 30
-      selector:
-        number:
-          min: 0.0
-          max: 60.0
-          step: 1.0
-          mode: slider
+
     notification_device:
       name: Notification Device
-      description: The mobile app device to notify.
+      description: The mobile device running the Home Assistant app to receive reminders.
       selector:
         device:
           integration: mobile_app
           multiple: false
-    notification_title:
-      name: Notification Title
-      description: The title of the reminder notification.
-      default: Friendly Reminder
-    notification_message:
-      name: Notification Message
-      description: The message for the reminder notification.
-      default: Hey, it's getting late! Don't forget to brush your teeth.
+
+    enable_morning:
+      name: Enable Morning Reminders
+      description: Check this box to track and remind you in the morning.
+      default: false
+      selector:
+        boolean: {}
+
+    enable_evening:
+      name: Enable Evening Reminders
+      description: Check this box to track and remind you in the evening.
+      default: true
+      selector:
+        boolean: {}
+
+    # --- ADVANCED CONFIGURATION (COLLAPSED) ---
+    advanced_timing:
+      name: ⚙️ Advanced Timing Options
+      icon: mdi:clock-outline
+      collapsed: true
+      input:
+        morning_check_start_time:
+          name: Morning Check Start Time
+          description: Earliest time a morning brushing session counts.
+          default: '05:00:00'
+          selector:
+            time: {}
+        morning_reminder_time:
+          name: Morning Reminder Time
+          description: The baseline time to check if you brushed this morning.
+          default: '09:00:00'
+          selector:
+            time: {}
+        evening_check_start_time:
+          name: Evening Check Start Time
+          description: Earliest time an evening brushing session counts.
+          default: '17:00:00'
+          selector:
+            time: {}
+        evening_reminder_time:
+          name: Evening Reminder Time
+          description: The baseline time to check if you brushed this evening.
+          default: '21:00:00'
+          selector:
+            time: {}
+        brushing_duration:
+          name: Minimum Brushing Duration (minutes)
+          description: How long the toothbrush must run to count as a valid session.
+          default: 2
+          selector:
+            number:
+              min: 1.0
+              max: 5.0
+              step: 1.0
+              mode: box
+
+    advanced_randomizer:
+      name: 🎲 ADHD Randomizer Delay
+      description: Adjust the unpredictable window to stop your brain from tuning out the alarm.
+      icon: mdi:dice-multiple
+      collapsed: true
+      input:
+        min_random_delay:
+          name: Minimum Random Delay (minutes)
+          default: 15
+          selector:
+            number:
+              min: 0.0
+              max: 60.0
+              step: 1.0
+              mode: slider
+        max_random_delay:
+          name: Maximum Random Delay (minutes)
+          default: 30
+          selector:
+            number:
+              min: 0.0
+              max: 60.0
+              step: 1.0
+              mode: slider
+
+    advanced_notifications:
+      name: 💬 Custom Notification Text
+      icon: mdi:message-text-outline
+      collapsed: true
+      input:
+        notification_title:
+          name: Notification Title
+          default: Routine Check-In 🪥
+          selector:
+            text: {}
+        morning_message:
+          name: Morning Message
+          default: Fresh breath baseline! Let's get those teeth brushed before the day gets away from you.
+          selector:
+            text: {}
+        evening_message:
+          name: Evening Message
+          default: Future you will thank you. Let's knock out toothbrushing now so you can properly unwind.
+          selector:
+            text: {}
 
 variables:
   min_delay: !input min_random_delay
@@ -112,39 +146,33 @@ variables:
 mode: single
 
 trigger:
-  # Trigger: Toothbrush starts running
   - platform: state
     entity_id: !input toothbrush_entity
     to: 'running'
     for:
       minutes: !input brushing_duration
     id: 'toothbrush_used'
-  # Trigger: Morning alarm time
   - platform: time
     at: !input morning_reminder_time
     id: 'morning_alarm'
-  # Trigger: Evening alarm time
   - platform: time
     at: !input evening_reminder_time
     id: 'evening_alarm'
-  # Trigger: Midnight reset (for morning track)
   - platform: time
     at: '00:00:00'
     id: 'reset_morning'
-  # Trigger: Noon reset (for evening track)
   - platform: time
     at: '12:00:00'
     id: 'reset_evening'
 
 action:
   - choose:
-      # 1. Toothbrush Used Logic
+      # 1. Toothbrush Tracking
       - conditions:
           - condition: trigger
             id: 'toothbrush_used'
         sequence:
           - choose:
-              # If morning is enabled and it's before noon
               - conditions:
                   - condition: template
                     value_template: "{{ morning_enabled }}"
@@ -155,7 +183,6 @@ action:
                   - service: input_boolean.turn_on
                     target:
                       entity_id: !input brushed_helper
-              # If evening is enabled and it's after the evening start time
               - conditions:
                   - condition: template
                     value_template: "{{ evening_enabled }}"
@@ -167,7 +194,7 @@ action:
                     target:
                       entity_id: !input brushed_helper
 
-      # 2. Morning Reminder Logic
+      # 2. Morning Reminder
       - conditions:
           - condition: trigger
             id: 'morning_alarm'
@@ -186,9 +213,9 @@ action:
             type: notify
             device_id: !input notification_device
             title: !input notification_title
-            message: !input notification_message
+            message: !input morning_message
 
-      # 3. Evening Reminder Logic
+      # 3. Evening Reminder
       - conditions:
           - condition: trigger
             id: 'evening_alarm'
@@ -207,7 +234,7 @@ action:
             type: notify
             device_id: !input notification_device
             title: !input notification_title
-            message: !input notification_message
+            message: !input evening_message
 
       # 4. Resets
       - conditions:
