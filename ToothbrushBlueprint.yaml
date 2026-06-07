@@ -1,146 +1,231 @@
 blueprint:
-  name: Evening Brushing System
-  description: A full-system blueprint to track evening toothbrushing and send a random reminder.
+  name: Flexible Brushing System (Morning & Evening)
+  description: >
+    Tracks morning and/or evening toothbrushing and sends a random, ADHD-friendly reminder if you forget.
+    **Note:** You must manually create one Input Boolean (Toggle) helper to use this blueprint.
   domain: automation
-  author: Your Name (or leave blank)
   homeassistant:
-    min_version: '2023.11.0'
+    min_version: 2023.11.0
   input:
-    system_id:
-      name: System ID
-      description: A unique ID for this system (e.g., 'evening_brushing'). Used for entity names.
-      default: 'evening_brushing'
-      selector:
-        text:
     toothbrush_entity:
       name: Toothbrush State Sensor
       description: The 'state' sensor of your Oral-B toothbrush.
       selector:
         entity:
           domain: sensor
-    reminder_time:
-      name: Reminder Time
-      description: The time of day to send the reminder.
-      default: '21:00:00'
+          multiple: false
+    brushed_helper:
+      name: Brushing Tracker (Input Boolean)
+      description: The toggle helper used to store whether you've brushed for the current session.
       selector:
-        time:
+        entity:
+          domain: input_boolean
+          multiple: false
+    enable_morning:
+      name: Enable Morning Reminder
+      description: Toggle this on to track and remind you in the morning.
+      default: false
+      selector:
+        boolean: {}
+    morning_check_start_time:
+      name: Morning Check Start Time
+      description: The earliest time a morning brushing session counts.
+      default: '05:00:00'
+      selector:
+        time: {}
+    morning_reminder_time:
+      name: Morning Reminder Time
+      description: The baseline time to check if you brushed this morning.
+      default: '09:00:00'
+      selector:
+        time: {}
+    enable_evening:
+      name: Enable Evening Reminder
+      description: Toggle this on to track and remind you in the evening.
+      default: true
+      selector:
+        boolean: {}
     evening_check_start_time:
       name: Evening Check Start Time
-      description: The time to start checking for a brushing session.
+      description: The earliest time an evening brushing session counts.
       default: '17:00:00'
       selector:
-        time:
+        time: {}
+    evening_reminder_time:
+      name: Evening Reminder Time
+      description: The baseline time to check if you brushed this evening.
+      default: '21:00:00'
+      selector:
+        time: {}
     brushing_duration:
       name: Brushing Duration (minutes)
       description: The length of a valid brushing session.
-      default: 5
+      default: 2
       selector:
         number:
-          min: 1
-          max: 10
-          step: 1
+          min: 1.0
+          max: 10.0
+          step: 1.0
           mode: box
     min_random_delay:
       name: Minimum Random Delay (minutes)
-      description: The minimum number of minutes for the random delay.
-      default: 0
+      description: Minimum minutes to delay the notification.
+      default: 15
       selector:
         number:
-          min: 0
-          max: 60
-          step: 1
+          min: 0.0
+          max: 60.0
+          step: 1.0
           mode: slider
     max_random_delay:
       name: Maximum Random Delay (minutes)
-      description: The maximum number of minutes for the random delay.
-      default: 10
+      description: Maximum minutes to delay the notification.
+      default: 30
       selector:
         number:
-          min: 0
-          max: 60
-          step: 1
+          min: 0.0
+          max: 60.0
+          step: 1.0
           mode: slider
     notification_device:
       name: Notification Device
-      description: The mobile device to send the notification to.
+      description: The mobile app device to notify.
       selector:
         device:
           integration: mobile_app
+          multiple: false
     notification_title:
       name: Notification Title
       description: The title of the reminder notification.
-      default: 'Friendly Reminder'
+      default: Friendly Reminder
     notification_message:
       name: Notification Message
       description: The message for the reminder notification.
-      default: 'Hey, it''s getting late! Don''t forget to brush your teeth.'
+      default: Hey, it's getting late! Don't forget to brush your teeth.
 
-automation:
-  - id: '{{ system_id }}_set_flag'
-    alias: '{{ system_id | replace("_", " ") | title }} - Set Flag'
-    description: Turns on helper when toothbrush is used in the evening.
-    trigger:
-      - platform: state
-        entity_id: !input 'toothbrush_entity'
-        to: 'running'
-        for:
-          minutes: !input 'brushing_duration'
-    condition:
-      - condition: time
-        after: !input 'evening_check_start_time'
-        before: '23:59:59'
-    action:
-      - service: input_boolean.turn_on
-        target:
-          entity_id: input_boolean.{{ system_id }}
-    mode: single
+variables:
+  min_delay: !input min_random_delay
+  max_delay: !input max_random_delay
+  morning_enabled: !input enable_morning
+  evening_enabled: !input enable_evening
 
-  - id: '{{ system_id }}_send_reminder'
-    alias: '{{ system_id | replace("_", " ") | title }} - Send Reminder'
-    description: Sends the reminder notification if helper is off.
-    trigger:
-      - platform: time
-        at: !input 'reminder_time'
-    condition:
-      - condition: state
-        entity_id: input_boolean.{{ system_id }}
-        state: 'off'
-    action:
-      - delay:
-          minutes: "{{ range(states('input_number.{{ system_id }}_min_delay') | int, (states('input_number.{{ system_id }}_max_delay') | int) + 1) | random }}"
-      - service: notify.mobile_app_{{ device_id(notification_device) }}
-        data:
-          title: !input 'notification_title'
-          message: !input 'notification_message'
-    mode: single
+mode: single
 
-  - id: '{{ system_id }}_reset_flag'
-    alias: '{{ system_id | replace("_", " ") | title }} - Reset Flag'
-    description: Resets the helper flag at midnight.
-    trigger:
-      - platform: time
-        at: '00:00:00'
-    action:
-      - service: input_boolean.turn_off
-        target:
-          entity_id: input_boolean.{{ system_id }}
-    mode: single
+trigger:
+  # Trigger: Toothbrush starts running
+  - platform: state
+    entity_id: !input toothbrush_entity
+    to: 'running'
+    for:
+      minutes: !input brushing_duration
+    id: 'toothbrush_used'
+  # Trigger: Morning alarm time
+  - platform: time
+    at: !input morning_reminder_time
+    id: 'morning_alarm'
+  # Trigger: Evening alarm time
+  - platform: time
+    at: !input evening_reminder_time
+    id: 'evening_alarm'
+  # Trigger: Midnight reset (for morning track)
+  - platform: time
+    at: '00:00:00'
+    id: 'reset_morning'
+  # Trigger: Noon reset (for evening track)
+  - platform: time
+    at: '12:00:00'
+    id: 'reset_evening'
 
-helper:
-  - name: '{{ system_id | replace("_", " ") | title }} Toggle'
-    entity_id: input_boolean.{{ system_id }}
-    platform: input_boolean
-  - name: '{{ system_id | replace("_", " ") | title }} Min Delay'
-    entity_id: input_number.{{ system_id }}_min_delay
-    platform: input_number
-    min: 0
-    max: 60
-    step: 1
-    mode: slider
-  - name: '{{ system_id | replace("_", " ") | title }} Max Delay'
-    entity_id: input_number.{{ system_id }}_max_delay
-    platform: input_number
-    min: 0
-    max: 60
-    step: 1
-    mode: slider
+action:
+  - choose:
+      # 1. Toothbrush Used Logic
+      - conditions:
+          - condition: trigger
+            id: 'toothbrush_used'
+        sequence:
+          - choose:
+              # If morning is enabled and it's before noon
+              - conditions:
+                  - condition: template
+                    value_template: "{{ morning_enabled }}"
+                  - condition: time
+                    after: !input morning_check_start_time
+                    before: '12:00:00'
+                sequence:
+                  - service: input_boolean.turn_on
+                    target:
+                      entity_id: !input brushed_helper
+              # If evening is enabled and it's after the evening start time
+              - conditions:
+                  - condition: template
+                    value_template: "{{ evening_enabled }}"
+                  - condition: time
+                    after: !input evening_check_start_time
+                    before: '23:59:59'
+                sequence:
+                  - service: input_boolean.turn_on
+                    target:
+                      entity_id: !input brushed_helper
+
+      # 2. Morning Reminder Logic
+      - conditions:
+          - condition: trigger
+            id: 'morning_alarm'
+          - condition: template
+            value_template: "{{ morning_enabled }}"
+          - condition: state
+            entity_id: !input brushed_helper
+            state: 'off'
+        sequence:
+          - delay:
+              minutes: "{{ range(min_delay | int, max_delay | int + 1) | random }}"
+          - condition: state
+            entity_id: !input brushed_helper
+            state: 'off'
+          - domain: mobile_app
+            type: notify
+            device_id: !input notification_device
+            title: !input notification_title
+            message: !input notification_message
+
+      # 3. Evening Reminder Logic
+      - conditions:
+          - condition: trigger
+            id: 'evening_alarm'
+          - condition: template
+            value_template: "{{ evening_enabled }}"
+          - condition: state
+            entity_id: !input brushed_helper
+            state: 'off'
+        sequence:
+          - delay:
+              minutes: "{{ range(min_delay | int, max_delay | int + 1) | random }}"
+          - condition: state
+            entity_id: !input brushed_helper
+            state: 'off'
+          - domain: mobile_app
+            type: notify
+            device_id: !input notification_device
+            title: !input notification_title
+            message: !input notification_message
+
+      # 4. Resets
+      - conditions:
+          - condition: trigger
+            id: 'reset_morning'
+          - condition: template
+            value_template: "{{ morning_enabled }}"
+        sequence:
+          - service: input_boolean.turn_off
+            target:
+              entity_id: !input brushed_helper
+
+      - conditions:
+          - condition: trigger
+            id: 'reset_evening'
+          - condition: template
+            value_template: "{{ evening_enabled }}"
+        sequence:
+          - service: input_boolean.turn_off
+            target:
+              entity_id: !input brushed_helper
