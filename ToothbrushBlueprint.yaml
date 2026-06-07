@@ -131,7 +131,7 @@ blueprint:
               mode: box
         use_custom_morning_start:
           name: Override Morning Check Time
-          description: ⚠️ ADVANCED: The system naturally starts tracking morning brushing at 4:00 AM. Only check this box if you have a highly unusual schedule (e.g., shift work) and need to alter the core logic.
+          description: "⚠️ ADVANCED: The system naturally starts tracking morning brushing at 4:00 AM. Only check this box if you have a highly unusual schedule (e.g., shift work) and need to alter the core logic."
           default: false
           selector:
             boolean: {}
@@ -143,7 +143,7 @@ blueprint:
             time: {}
         use_custom_evening_start:
           name: Override Evening Check Time
-          description: ⚠️ ADVANCED: The system naturally starts tracking evening brushing at 4:00 PM (16:00). Only check this box to alter the core logic.
+          description: "⚠️ ADVANCED: The system naturally starts tracking evening brushing at 4:00 PM (16:00). Only check this box to alter the core logic."
           default: false
           selector:
             boolean: {}
