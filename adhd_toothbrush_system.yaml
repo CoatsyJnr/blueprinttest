@@ -4,25 +4,33 @@ blueprint:
     An unpredictable, ADHD-friendly toothbrushing tracker and reminder system. 
     Delays notifications by a random window to defeat notification blindness.
     
-    **Prerequisite:** You must manually create one 'Input Boolean' (Toggle) helper in Home Assistant before configuring this automation.
+    **Prerequisite:** Create a 'Toggle' helper (Settings > Devices & Services > Helpers) named something obvious like "Toothbrush Tracker". This acts as the brain to remember if you have successfully brushed today.
   domain: automation
+  source_url: https://github.com/CoatsyJnr/home-assistant-blueprints/blob/main/adhd_toothbrush_system.yaml
+  author: CoatsyJnr
   homeassistant:
-    min_version: 2023.11.0
+    min_version: 2024.6.0
   
   input:
     # --- PRIMARY SETUP ---
     toothbrush_entity:
-      name: Toothbrush State Sensor
-      description: Select your Oral-B toothbrush state sensor.
+      name: Which toothbrush are we tracking?
+      description: >
+        Select the sensor that tracks what your brush is doing right now. 
+        For Oral-B, select the sensor explicitly named "State". For Philips Sonicare, choose the "Handle State" sensor, the "Activity" sensor, or the "Brushing" binary sensor.
       selector:
         entity:
-          integration: oralb
-          domain: sensor
+          domain: 
+            - sensor
+            - binary_sensor
+          integration:
+            - oralb
+            - philips_sonicare_ble
           multiple: false
 
     brushed_helper:
       name: Brushing Tracker Helper
-      description: Choose the Input Boolean (Toggle) helper you created to track your daily progress.
+      description: Choose the Toggle helper you created (e.g., "Toothbrush Tracker").
       selector:
         entity:
           domain: input_boolean
@@ -111,6 +119,12 @@ blueprint:
           default: Future you will thank you. Let's knock out toothbrushing now so you can properly unwind.
           selector:
             text: {}
+        notification_group:
+          name: Notification Group / Thread ID
+          description: Groups these reminders together in your mobile notification center to prevent clutter. Works on both iOS and Android.
+          default: toothbrush_routine
+          selector:
+            text: {}
         brushing_duration:
           name: Minimum Brushing Duration (minutes)
           description: How long the toothbrush must run to count as a valid session.
@@ -161,7 +175,12 @@ mode: single
 trigger:
   - platform: state
     entity_id: !input toothbrush_entity
-    to: 'running'
+    to:
+      - 'running'
+      - 'Running'
+      - 'Brushing'
+      - 'On'
+      - 'on'
     for:
       minutes: !input brushing_duration
     id: 'toothbrush_used'
@@ -238,6 +257,10 @@ action:
             device_id: !input notification_device
             title: !input notification_title
             message: !input morning_message
+            data:
+              group: !input notification_group
+              push:
+                thread-id: !input notification_group
 
       # 3. Evening Reminder
       - conditions:
@@ -264,6 +287,10 @@ action:
             device_id: !input notification_device
             title: !input notification_title
             message: !input evening_message
+            data:
+              group: !input notification_group
+              push:
+                thread-id: !input notification_group
 
       # 4. Resets
       - conditions:
