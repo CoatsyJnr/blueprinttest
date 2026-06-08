@@ -20,13 +20,14 @@ blueprint:
         For Oral-B, select the sensor explicitly named "State". For Philips Sonicare, choose the "Handle State" sensor, the "Activity" sensor, or the "Brushing" binary sensor.
       selector:
         entity:
-          domain: 
-            - sensor
-            - binary_sensor
-          integration:
-            - oralb
-            - philips_sonicare_ble
           multiple: false
+          filter:
+            - integration: oralb
+              domain: sensor
+            - integration: philips_sonicare_ble
+              domain: sensor
+            - integration: philips_sonicare_ble
+              domain: binary_sensor
 
     brushed_helper:
       name: Brushing Tracker Helper
