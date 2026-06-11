@@ -312,6 +312,7 @@ action:
                   message: !input morning_message
                   data:
                     channel: !input notification_channel
+                    importance: high
                     group: !input notification_group
                     tag: !input notification_tag
                     ttl: 7200
@@ -393,6 +394,7 @@ action:
                   message: !input evening_message
                   data:
                     channel: !input notification_channel
+                    importance: high
                     group: !input notification_group
                     tag: !input notification_tag
                     ttl: 7200
