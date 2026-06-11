@@ -2,7 +2,8 @@ blueprint:
   name: ADHD-Friendly Brushing System (Morning & Evening)
   description: >
     An unpredictable, ADHD-friendly toothbrushing tracker and reminder system. 
-    Delays notifications by a random window to defeat notification blindness.
+    Delays notifications by a random window to defeat notification blindness and 
+    includes actionable snooze/complete options.
     
     **Prerequisite:** Create a 'Toggle' helper (Settings > Devices & Services > Helpers) named something obvious like "Toothbrush Tracker". This acts as the brain to remember if you have successfully brushed today.
   domain: automation
@@ -126,6 +127,22 @@ blueprint:
           default: toothbrush_routine
           selector:
             text: {}
+        enable_random_snooze:
+          name: Enable Randomized Snooze
+          description: If enabled, snoozing will wait a random window between 4.5 and 5.5 minutes to prevent predictable pacing.
+          default: true
+          selector:
+            boolean: {}
+        fixed_snooze_duration:
+          name: Fixed Snooze Duration (minutes)
+          description: If randomized snooze is turned off, this sets the explicit snooze duration.
+          default: 5
+          selector:
+            number:
+              min: 1.0
+              max: 30.0
+              step: 1.0
+              mode: box
         brushing_duration:
           name: Minimum Brushing Duration (minutes)
           description: How long the toothbrush must run to count as a valid session.
@@ -171,7 +188,8 @@ variables:
   use_custom_pm_start: !input use_custom_evening_start
   custom_pm_start: !input custom_evening_start_time
 
-mode: single
+mode: parallel
+max: 10
 
 triggers:
   - platform: state
@@ -200,7 +218,7 @@ triggers:
 
 action:
   - choose:
-      # 1. Toothbrush Tracking
+      # 1. Toothbrush Tracking Instance
       - conditions:
           - condition: trigger
             id: 'toothbrush_used'
@@ -233,7 +251,7 @@ action:
                     target:
                       entity_id: !input brushed_helper
 
-      # 2. Morning Reminder
+      # 2. Morning Notification Engine Instance
       - conditions:
           - condition: trigger
             id: 'morning_alarm'
@@ -243,27 +261,74 @@ action:
             entity_id: !input brushed_helper
             state: 'off'
         sequence:
-          - delay:
-              minutes: >
-                {% if randomizer_enabled %}
-                  {{ range(0, max_delay | int + 1) | random }}
-                {% else %}
-                  0
-                {% endif %}
+          - if:
+              - condition: template
+                value_template: "{{ randomizer_enabled }}"
+            then:
+              - delay:
+                  minutes: "{{ range(0, max_delay | int + 1) | random }}"
           - condition: state
             entity_id: !input brushed_helper
             state: 'off'
-          - domain: mobile_app
-            type: notify
-            device_id: !input notification_device
-            title: !input notification_title
-            message: !input morning_message
-            data:
-              group: !input notification_group
-              push:
-                thread-id: !input notification_group
+          - repeat:
+              while:
+                - condition: state
+                  entity_id: !input brushed_helper
+                  state: 'off'
+              sequence:
+                - variables:
+                    random_snooze: !input enable_random_snooze
+                    fixed_snooze: !input fixed_snooze_duration
+                    snooze_seconds: >
+                      {% if random_snooze %}
+                        {{ range(270, 331) | random }}
+                      {% else %}
+                        {{ fixed_snooze | int * 60 }}
+                      {% endif %}
+                - domain: mobile_app
+                  type: notify
+                  device_id: !input notification_device
+                  title: !input notification_title
+                  message: !input morning_message
+                  data:
+                    group: !input notification_group
+                    push:
+                      thread-id: !input notification_group
+                    actions:
+                      - action: "toothbrush_snooze"
+                        title: "Snooze ⏳"
+                      - action: "toothbrush_marked"
+                        title: "Already Brushed ✅"
+                - wait_for_trigger:
+                    - platform: event
+                      event_type: mobile_app_notification_action
+                      event_data:
+                        action: "toothbrush_snooze"
+                    - platform: event
+                      event_type: mobile_app_notification_action
+                      event_data:
+                        action: "toothbrush_marked"
+                    - platform: state
+                      entity_id: !input brushed_helper
+                      to: 'on'
+                  timeout:
+                    seconds: "{{ snooze_seconds }}"
+                - choose:
+                    - conditions:
+                        - condition: template
+                          value_template: "{{ wait.trigger is defined and wait.trigger != none and wait.trigger.platform == 'event' and wait.trigger.event.data.action == 'toothbrush_marked' }}"
+                      sequence:
+                        - action: input_boolean.turn_on
+                          target:
+                            entity_id: !input brushed_helper
+                    - conditions:
+                        - condition: template
+                          value_template: "{{ wait.trigger is defined and wait.trigger != none and wait.trigger.platform == 'event' and wait.trigger.event.data.action == 'toothbrush_snooze' }}"
+                      sequence:
+                        - delay:
+                            seconds: "{{ snooze_seconds }}"
 
-      # 3. Evening Reminder
+      # 3. Evening Notification Engine Instance
       - conditions:
           - condition: trigger
             id: 'evening_alarm'
@@ -273,25 +338,72 @@ action:
             entity_id: !input brushed_helper
             state: 'off'
         sequence:
-          - delay:
-              minutes: >
-                {% if randomizer_enabled %}
-                  {{ range(0, max_delay | int + 1) | random }}
-                {% else %}
-                  0
-                {% endif %}
+          - if:
+              - condition: template
+                value_template: "{{ randomizer_enabled }}"
+            then:
+              - delay:
+                  minutes: "{{ range(0, max_delay | int + 1) | random }}"
           - condition: state
             entity_id: !input brushed_helper
             state: 'off'
-          - domain: mobile_app
-            type: notify
-            device_id: !input notification_device
-            title: !input notification_title
-            message: !input evening_message
-            data:
-              group: !input notification_group
-              push:
-                thread-id: !input notification_group
+          - repeat:
+              while:
+                - condition: state
+                  entity_id: !input brushed_helper
+                  state: 'off'
+              sequence:
+                - variables:
+                    random_snooze: !input enable_random_snooze
+                    fixed_snooze: !input fixed_snooze_duration
+                    snooze_seconds: >
+                      {% if random_snooze %}
+                        {{ range(270, 331) | random }}
+                      {% else %}
+                        {{ fixed_snooze | int * 60 }}
+                      {% endif %}
+                - domain: mobile_app
+                  type: notify
+                  device_id: !input notification_device
+                  title: !input notification_title
+                  message: !input evening_message
+                  data:
+                    group: !input notification_group
+                    push:
+                      thread-id: !input notification_group
+                    actions:
+                      - action: "toothbrush_snooze"
+                        title: "Snooze ⏳"
+                      - action: "toothbrush_marked"
+                        title: "Already Brushed ✅"
+                - wait_for_trigger:
+                    - platform: event
+                      event_type: mobile_app_notification_action
+                      event_data:
+                        action: "toothbrush_snooze"
+                    - platform: event
+                      event_type: mobile_app_notification_action
+                      event_data:
+                        action: "toothbrush_marked"
+                    - platform: state
+                      entity_id: !input brushed_helper
+                      to: 'on'
+                  timeout:
+                    seconds: "{{ snooze_seconds }}"
+                - choose:
+                    - conditions:
+                        - condition: template
+                          value_template: "{{ wait.trigger is defined and wait.trigger != none and wait.trigger.platform == 'event' and wait.trigger.event.data.action == 'toothbrush_marked' }}"
+                      sequence:
+                        - action: input_boolean.turn_on
+                          target:
+                            entity_id: !input brushed_helper
+                    - conditions:
+                        - condition: template
+                          value_template: "{{ wait.trigger is defined and wait.trigger != none and wait.trigger.platform == 'event' and wait.trigger.event.data.action == 'toothbrush_snooze' }}"
+                      sequence:
+                        - delay:
+                            seconds: "{{ snooze_seconds }}"
 
       # 4. Resets
       - conditions:
