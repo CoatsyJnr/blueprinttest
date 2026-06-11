@@ -121,9 +121,15 @@ blueprint:
           default: Future you will thank you. Let's knock out toothbrushing now so you can properly unwind.
           selector:
             text: {}
+        notification_channel:
+          name: Android Notification Channel
+          description: The user-friendly name that will appear in Android's notification settings (Apps > Home Assistant > Notification Channels), allowing custom sounds and vibration rules.
+          default: "Toothbrush Routine"
+          selector:
+            text: {}
         notification_group:
           name: Notification Group / Thread ID
-          description: Groups these reminders together in your mobile notification center to prevent clutter. Works on both iOS and Android.
+          description: The invisible system key that groups these reminders together in your mobile notification center to prevent clutter. Works on both iOS and Android.
           default: toothbrush_routine
           selector:
             text: {}
@@ -291,6 +297,7 @@ action:
                   title: !input notification_title
                   message: !input morning_message
                   data:
+                    channel: !input notification_channel
                     group: !input notification_group
                     push:
                       thread-id: !input notification_group
@@ -368,6 +375,7 @@ action:
                   title: !input notification_title
                   message: !input evening_message
                   data:
+                    channel: !input notification_channel
                     group: !input notification_group
                     push:
                       thread-id: !input notification_group
