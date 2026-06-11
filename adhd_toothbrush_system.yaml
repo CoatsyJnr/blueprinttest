@@ -3,7 +3,7 @@ blueprint:
   description: >
     An unpredictable, ADHD-friendly toothbrushing tracker and reminder system. 
     Delays notifications by a random window to defeat notification blindness and 
-    includes actionable snooze/complete options.
+    includes actionable snooze/complete options. Supports offline queuing rules.
     
     **Prerequisite:** Create a 'Toggle' helper (Settings > Devices & Services > Helpers) named something obvious like "Toothbrush Tracker". This acts as the brain to remember if you have successfully brushed today.
   domain: automation
@@ -125,6 +125,12 @@ blueprint:
           name: Android Notification Channel
           description: The user-friendly name that will appear in Android's notification settings (Apps > Home Assistant > Notification Channels), allowing custom sounds and vibration rules.
           default: "Toothbrush Routine"
+          selector:
+            text: {}
+        notification_tag:
+          name: Notification Tag Identifier
+          description: The unique tracking key used to clear or overwrite active alerts instantly when you brush your teeth.
+          default: toothbrush_reminder
           selector:
             text: {}
         notification_group:
@@ -256,6 +262,14 @@ action:
                   - action: input_boolean.turn_on
                     target:
                       entity_id: !input brushed_helper
+          
+          # Force an immediate remote clear command to purge any offline queued notifications
+          - domain: mobile_app
+            type: notify
+            device_id: !input notification_device
+            message: "clear_notification"
+            data:
+              tag: !input notification_tag
 
       # 2. Morning Notification Engine Instance
       - conditions:
@@ -299,6 +313,9 @@ action:
                   data:
                     channel: !input notification_channel
                     group: !input notification_group
+                    tag: !input notification_tag
+                    ttl: 7200
+                    priority: high
                     push:
                       thread-id: !input notification_group
                     actions:
@@ -377,6 +394,9 @@ action:
                   data:
                     channel: !input notification_channel
                     group: !input notification_group
+                    tag: !input notification_tag
+                    ttl: 7200
+                    priority: high
                     push:
                       thread-id: !input notification_group
                     actions:
